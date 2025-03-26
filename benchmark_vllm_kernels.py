@@ -26,7 +26,7 @@ if __name__ == '__main__':
     k_scale = 1.0
     v_scale = 1.0
 
-    seq_len = 2048
+    seq_len = 8192
     max_block_per_seq = seq_len // block_size
 
     long_seq_len = 2048
@@ -46,7 +46,11 @@ if __name__ == '__main__':
     values = torch.arange(0, num_blocks, dtype=torch.long, device="cuda")
     values = values[torch.randperm(num_blocks)]
 
-    block_tables = values[:batch_size * max_block_per_seq].view(batch_size, max_block_per_seq)
+    block_tables = torch.zeros((batch_size, max_block_per_seq), dtype=torch.int32, device="cuda")
+    for i in range(batch_size):
+        block_tables[i][0:long_seq_len//block_size] = torch.randint(0, num_blocks, (long_seq_len // block_size,), dtype=torch.int32, device="cuda")
+
+    #block_tables = values[:batch_size * max_block_per_seq].view(batch_size, max_block_per_seq)
     query_lens = [1 for i in range(batch_size)]
     context_lens = [short_seq_len - 1 for i in range(short_seq_count)] + [long_seq_len - 1 for i in range(long_seq_count)]
     seq_lens = torch.tensor([a + b for a, b in zip(query_lens, context_lens)], dtype=torch.long, device="cuda")
