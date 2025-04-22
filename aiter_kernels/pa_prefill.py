@@ -10,7 +10,7 @@ import triton
 import triton.language as tl
 
 BASE_BLOCK = 64
-NUM_WARPS = 4
+NUM_WARPS = 1
 
 
 if triton.__version__ >= "2.1.0":

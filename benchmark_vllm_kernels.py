@@ -31,7 +31,7 @@ if __name__ == '__main__':
 
     long_seq_len = 2048
     short_seq_len = 256
-    ratio = 0 # Number of long sequence wrt to short sequence. 0.1 means that 10% of the sequences are long.
+    ratio = 1 # Number of long sequence wrt to short sequence. 0.1 means that 10% of the sequences are long.
     long_seq_count = int(ratio * batch_size)
     short_seq_count = batch_size - long_seq_count
 

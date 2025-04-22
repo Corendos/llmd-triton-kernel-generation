@@ -13,7 +13,7 @@ if __name__ == '__main__':
     head_size = 128
     block_size = 16
     num_blocks = 4096
-    max_input_len = 256
+    max_input_len = 1
     max_seq_len = 8192
     scale = 0.08838834765
     alibi_slopes = None
@@ -32,7 +32,7 @@ if __name__ == '__main__':
     block_tables[:, 0] = 0
     seq_lens = torch.full((batch_size,), 0, dtype=torch.int32, device="cuda")
     seq_lens[0] = 8
-    start_loc = torch.full((batch_size+1,), 2, dtype=torch.int32, device="cuda")
+    start_loc = torch.full((batch_size+1,), 1, dtype=torch.int32, device="cuda")
     start_loc[0] = 0
     sliding_window = 0
 
