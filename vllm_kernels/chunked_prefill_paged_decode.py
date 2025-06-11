@@ -31,29 +31,29 @@ def kernel_paged_attention_2d(
         scale,  # float32
         k_scale,  # float32
         v_scale,  # float32
-        num_query_heads: tl.constexpr,  # int
-        num_queries_per_kv: tl.constexpr,  # int
+        num_query_heads,  # int
+        num_queries_per_kv,  # int
         num_queries_per_kv_padded: tl.constexpr,  # int
-        block_table_stride: tl.constexpr,  # int
-        query_stride_0: tl.constexpr,  # int
-        query_stride_1: tl.constexpr,  # int, should be equal to head_size
-        output_stride_0: tl.constexpr,  # int
-        output_stride_1: tl.constexpr,  # int, should be equal to head_size
+        block_table_stride,  # int
+        query_stride_0,  # int
+        query_stride_1,  # int, should be equal to head_size
+        output_stride_0,  # int
+        output_stride_1,  # int, should be equal to head_size
         BLOCK_SIZE: tl.constexpr,  # int
         HEAD_SIZE: tl.constexpr,  # int
         HEAD_SIZE_PADDED: tl.constexpr,  # int, must be power of 2
         USE_ALIBI_SLOPES: tl.constexpr,  # bool
         SLIDING_WINDOW: tl.constexpr,  # int
-        x: tl.constexpr,  # int
-        stride_k_cache_0: tl.constexpr,  # int
-        stride_k_cache_1: tl.constexpr,  # int
-        stride_k_cache_2: tl.constexpr,  # int
-        stride_k_cache_3: tl.constexpr,  # int
-        stride_k_cache_4: tl.constexpr,  # int
-        stride_v_cache_0: tl.constexpr,  # int
-        stride_v_cache_1: tl.constexpr,  # int
-        stride_v_cache_2: tl.constexpr,  # int
-        stride_v_cache_3: tl.constexpr,  # int
+        x,  # int
+        stride_k_cache_0,  # int
+        stride_k_cache_1,  # int
+        stride_k_cache_2,  # int
+        stride_k_cache_3,  # int
+        stride_k_cache_4,  # int
+        stride_v_cache_0,  # int
+        stride_v_cache_1,  # int
+        stride_v_cache_2,  # int
+        stride_v_cache_3,  # int
         filter_by_query_len: tl.constexpr,  # bool
         query_start_len_ptr,  # [num_seqs+1]
 ):
@@ -301,6 +301,7 @@ def chunked_prefill_paged_decode(
         print(f"stride_v_cache_1: {value_cache.stride(1)}")
         print(f"stride_v_cache_2: {value_cache.stride(2)}")
         print(f"stride_v_cache_3: {value_cache.stride(3)}")
+        print(f"sm_scale: {sm_scale}")
 
     compiled_kernel: triton.compiler.CompiledKernel = kernel_paged_attention_2d[grid](
         output_ptr=output,

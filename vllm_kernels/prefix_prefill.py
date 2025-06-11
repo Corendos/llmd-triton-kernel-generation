@@ -845,6 +845,8 @@ if triton.__version__ >= "2.1.0":
             )
             return
 
+        if SHOULD_LOG:
+            print("Calling _fwd_kernel with grid: {}".format(grid))
         compiled_kernel: triton.compiler.CompiledKernel = _fwd_kernel[grid](
             q,
             k,
