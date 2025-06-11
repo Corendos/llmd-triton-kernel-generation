@@ -223,7 +223,7 @@ def chunked_prefill_paged_decode(
     SHOULD_LOG = os.environ.get("SHOULD_LOG", None) is not None
 
     if sm_scale is None:
-        sm_scale = 1.0 / (query.shape[1]**0.5)
+        sm_scale = 1.0 / (query.shape[2]**0.5)
 
     use_alibi_slopes = alibi_slopes is not None
 
