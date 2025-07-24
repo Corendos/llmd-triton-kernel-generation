@@ -12,7 +12,6 @@ if __name__ == '__main__':
     seed_everything(0)
     torch.set_default_device("cuda")
 
-    token_count = 256
     batch_size = 256
     num_heads = 32
     num_kv_heads = 8
@@ -26,14 +25,19 @@ if __name__ == '__main__':
     k_scale = 1.0
     v_scale = 1.0
 
-    seq_len = 8192
-    max_block_per_seq = seq_len // block_size
-
-    long_seq_len = 2048
-    short_seq_len = 256
-    ratio = 0 # Number of long sequence wrt to short sequence. 0.1 means that 10% of the sequences are long.
+    long_seq_len = 2047
+    short_seq_len = 255
+    ratio = 1.0 # Number of long sequence wrt to short sequence. 0.1 means that 10% of the sequences are long.
     long_seq_count = int(ratio * batch_size)
     short_seq_count = batch_size - long_seq_count
+
+    query_lens = [1 for i in range(batch_size // 2)] + [1 for i in range(batch_size // 2)]
+    context_lens = [long_seq_len if i < long_seq_count else short_seq_len for i in range(batch_size)]
+
+    token_count = sum(query_lens)
+
+    max_seq_len = 8192
+    max_block_per_seq = max_seq_len // block_size
 
     x = 8
     query = torch.randn(token_count, num_heads, head_size, dtype=torch.bfloat16, device="cuda")
@@ -48,11 +52,11 @@ if __name__ == '__main__':
 
     block_tables = torch.zeros((batch_size, max_block_per_seq), dtype=torch.int32, device="cuda")
     for i in range(batch_size):
-        block_tables[i][0:long_seq_len//block_size] = torch.randint(0, num_blocks, (long_seq_len // block_size,), dtype=torch.int32, device="cuda")
+        seq_len = context_lens[i] + query_lens[i]
+        block_count = (seq_len + block_size - 1) // block_size
+        block_tables[i][0:block_count] = torch.randint(0, num_blocks, (block_count,), dtype=torch.int32, device="cuda")
 
-    #block_tables = values[:batch_size * max_block_per_seq].view(batch_size, max_block_per_seq)
-    query_lens = [1 for i in range(batch_size)]
-    context_lens = [short_seq_len - 1 for i in range(short_seq_count)] + [long_seq_len - 1 for i in range(long_seq_count)]
+
     seq_lens = torch.tensor([a + b for a, b in zip(query_lens, context_lens)], dtype=torch.long, device="cuda")
     start_loc = torch.cumsum(torch.tensor([0] + query_lens, dtype=torch.long), dim=0)
 
@@ -80,6 +84,7 @@ if __name__ == '__main__':
         sliding_window=None,
         sm_scale=None,
     )
+    print(o)
     torch.cuda.synchronize()
     start_time = time.time()
     ITERATIONS = 3000
