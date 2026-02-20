@@ -8,14 +8,14 @@
 #  - Thomas Parnell <tpa@zurich.ibm.com>
 
 import torch
-from vllm.logger import init_logger
-from vllm.model_executor.layers.batch_invariant import vllm_is_batch_invariant
-from vllm.platforms import current_platform
-from vllm.triton_utils import tl, triton
 
-logger = init_logger(__name__)
-is_batch_invariant = vllm_is_batch_invariant()
-float8_info = torch.finfo(current_platform.fp8_dtype())
+import triton
+import triton.language as tl
+
+from vllm.platforms import current_platform
+
+is_batch_invariant = False
+float8_info = torch.finfo(torch.float8_e4m3fn) # potentially not adapted
 
 
 @triton.jit
