@@ -1,6 +1,6 @@
 import os
 import torch
-from vllm_kernels.triton_unified_attention import unified_attention
+from vllm_kernels.old_triton_unified_attention import unified_attention
 
 os.environ["TRITON_BACKEND_DEBUG"] = "1"
 os.environ["SHOULD_LOG"] = "1"

@@ -2,7 +2,7 @@ from numpy import short
 import torch
 import random
 import time
-from vllm_kernels.triton_unified_attention import unified_attention
+from vllm_kernels.old_triton_unified_attention import unified_attention
 
 def seed_everything(seed):
     random.seed(seed)
@@ -110,4 +110,3 @@ if __name__ == '__main__':
     end_time = time.time()
     print(f"triton Time: {(end_time - start_time)*1000:.2f} ms")
     print(f"triton Time per invocation: {((end_time - start_time) / ITERATIONS)*1000:.2f} ms")
-
