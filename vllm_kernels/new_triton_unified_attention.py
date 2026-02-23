@@ -8,14 +8,12 @@
 #  - Thomas Parnell <tpa@zurich.ibm.com>
 
 import torch
-
+import os
 import triton
 import triton.language as tl
 
-from vllm.platforms import current_platform
-
 is_batch_invariant = False
-float8_info = torch.finfo(torch.float8_e4m3fn) # potentially not adapted
+float8_info = torch.finfo(torch.float8_e4m3fn)  # potentially not adapted
 
 
 @triton.jit
@@ -914,6 +912,8 @@ def unified_attention(
     assert causal, "Only causal attention is supported"
     assert q_descale is None, "Q scales not supported"
 
+    SHOULD_LOG = os.environ.get("SHOULD_LOG", None) is not None
+
     if sinks is not None:
         assert sinks.shape[0] == q.shape[1], "Sinks must be num_query_heads size"
 
@@ -985,7 +985,7 @@ def unified_attention(
         or num_seqs > seq_threshold_3D
         or is_batch_invariant
     ):
-        kernel_unified_attention_2d[
+        compiled_kernel = kernel_unified_attention_2d[
             (
                 total_num_q_blocks,
                 num_kv_heads,
@@ -1040,8 +1040,13 @@ def unified_attention(
             BLOCK_M=BLOCK_M,
             USE_FP8=output_scale is not None,
         )
+
+        if SHOULD_LOG:
+            print(f"kernel_2d: {compiled_kernel.src.constants}")
+            print(f"kernel_2d: {compiled_kernel.asm['ttir']}")
+
     else:
-        kernel_unified_attention_3d[
+        compiled_kernel = kernel_unified_attention_3d[
             (total_num_q_blocks, num_kv_heads, num_par_softmax_segments)
         ](
             segm_output_ptr=softmax_segm_output,
@@ -1092,6 +1097,11 @@ def unified_attention(
             BLOCK_M=BLOCK_M,
             NUM_SEGMENTS_PER_SEQ=num_par_softmax_segments,
         )
+
+        if SHOULD_LOG:
+            print(f"kernel_3d: {compiled_kernel.src.constants}")
+            print(f"kernel_3d: {compiled_kernel.asm['ttir']}")
+
         reduce_segments[(q.shape[0], num_query_heads)](
             output_ptr=out,
             segm_output_ptr=softmax_segm_output,
