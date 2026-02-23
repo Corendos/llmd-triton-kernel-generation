@@ -1,11 +1,12 @@
 import os
 import torch
-from vllm_kernels.new_triton_unified_attention import unified_attention
+from vllm_kernels.new_triton_unified_attention import wrapped_unified_attention
+
 
 torch.set_printoptions(threshold=torch.inf)
 torch.manual_seed(0)
 
-os.environ["SHOULD_RUN_3D"] = "1"
+os.environ["SHOULD_RUN_3D"] = "0"
 os.environ["TRITON_BACKEND_DEBUG"] = "1"
 os.environ["SHOULD_LOG"] = "1"
 
@@ -52,7 +53,7 @@ def generate_2D():
     print(f"alibi_slopes: {alibi_slopes}")
     print(f"scale: {scale}")
 
-    unified_attention(
+    wrapped_unified_attention(
         q=query,
         k=key_cache,
         v=value_cache,
@@ -121,7 +122,7 @@ def generate_3D():
     print(f"alibi_slopes: {alibi_slopes}")
     print(f"scale: {scale}")
 
-    unified_attention(
+    wrapped_unified_attention(
         q=query,
         k=key_cache,
         v=value_cache,
