@@ -1250,6 +1250,124 @@ def wrapped_kernel_unified_attention_2d(
         FP8_MAX,
     )
 
+@triton.jit
+def wrapped_kernel_unified_attention_3d(
+    segm_output_ptr,
+    segm_max_ptr,
+    segm_expsum_ptr,
+    query_ptr,
+    key_cache_ptr,
+    value_cache_ptr,
+    sink_ptr,
+    block_tables_ptr,
+    seq_lens_ptr,
+    alibi_slopes_ptr,
+    qq_bias_ptr,
+    scale_ptr,
+    k_scale_ptr,
+    v_scale_ptr,
+    softcap_ptr,
+    num_query_heads: tl.constexpr,
+    num_queries_per_kv: tl.constexpr,
+    block_table_stride_ptr,
+    query_stride_0_ptr,
+    query_stride_1_ptr,
+    qq_bias_stride_0_ptr,
+    BLOCK_SIZE: tl.constexpr,
+    TILE_SIZE: tl.constexpr,
+    HEAD_SIZE: tl.constexpr,
+    HEAD_SIZE_PADDED: tl.constexpr,
+    USE_ALIBI_SLOPES: tl.constexpr,
+    USE_ALIBI_SQRT: tl.constexpr,
+    USE_QQ_BIAS: tl.constexpr,
+    USE_SOFTCAP: tl.constexpr,
+    USE_SINKS: tl.constexpr,
+    SLIDING_WINDOW: tl.constexpr,
+    stride_k_cache_0_ptr,
+    stride_k_cache_1_ptr,
+    stride_k_cache_2_ptr,
+    stride_k_cache_3: tl.constexpr,
+    stride_v_cache_0_ptr,
+    stride_v_cache_1_ptr,
+    stride_v_cache_2_ptr,
+    stride_v_cache_3: tl.constexpr,
+    query_start_len_ptr,
+    BLOCK_Q: tl.constexpr,
+    num_seqs_ptr,
+    BLOCK_M: tl.constexpr,
+    NUM_SEGMENTS_PER_SEQ: tl.constexpr,
+    USE_MM_PREFIX: tl.constexpr,
+    MAX_MM_RANGES: tl.constexpr,
+    mm_prefix_range_ptr,
+):
+    # Load all scalars from pointers
+    scale = tl.load(scale_ptr)
+    k_scale = tl.load(k_scale_ptr)
+    v_scale = tl.load(v_scale_ptr)
+    softcap = tl.load(softcap_ptr)
+    block_table_stride = tl.load(block_table_stride_ptr)
+    query_stride_0 = tl.load(query_stride_0_ptr)
+    query_stride_1 = tl.load(query_stride_1_ptr)
+    qq_bias_stride_0 = tl.load(qq_bias_stride_0_ptr)
+    stride_k_cache_0 = tl.load(stride_k_cache_0_ptr)
+    stride_k_cache_1 = tl.load(stride_k_cache_1_ptr)
+    stride_k_cache_2 = tl.load(stride_k_cache_2_ptr)
+    stride_v_cache_0 = tl.load(stride_v_cache_0_ptr)
+    stride_v_cache_1 = tl.load(stride_v_cache_1_ptr)
+    stride_v_cache_2 = tl.load(stride_v_cache_2_ptr)
+    num_seqs = tl.load(num_seqs_ptr)
+
+    # Call the original kernel with loaded values
+    kernel_unified_attention_3d(
+        segm_output_ptr,
+        segm_max_ptr,
+        segm_expsum_ptr,
+        query_ptr,
+        key_cache_ptr,
+        value_cache_ptr,
+        sink_ptr,
+        block_tables_ptr,
+        seq_lens_ptr,
+        alibi_slopes_ptr,
+        qq_bias_ptr,
+        scale,
+        k_scale,
+        v_scale,
+        softcap,
+        num_query_heads,
+        num_queries_per_kv,
+        block_table_stride,
+        query_stride_0,
+        query_stride_1,
+        qq_bias_stride_0,
+        BLOCK_SIZE,
+        TILE_SIZE,
+        HEAD_SIZE,
+        HEAD_SIZE_PADDED,
+        USE_ALIBI_SLOPES,
+        USE_ALIBI_SQRT,
+        USE_QQ_BIAS,
+        USE_SOFTCAP,
+        USE_SINKS,
+        SLIDING_WINDOW,
+        stride_k_cache_0,
+        stride_k_cache_1,
+        stride_k_cache_2,
+        stride_k_cache_3,
+        stride_v_cache_0,
+        stride_v_cache_1,
+        stride_v_cache_2,
+        stride_v_cache_3,
+        query_start_len_ptr,
+        BLOCK_Q,
+        num_seqs,
+        BLOCK_M,
+        NUM_SEGMENTS_PER_SEQ,
+        USE_MM_PREFIX,
+        MAX_MM_RANGES,
+        mm_prefix_range_ptr,
+    )
+
 def wrapped_unified_attention(
     q,
     k,
@@ -1357,7 +1475,6 @@ def wrapped_unified_attention(
         or num_seqs > seq_threshold_3D
         or is_batch_invariant
     ):
-        import torch
 
         # Helper to create scalar pointers
         def scalar_ptr(val, dtype=torch.float32):
@@ -1426,56 +1543,61 @@ def wrapped_unified_attention(
             print(f"kernel_wrapped_2d: {compiled_kernel.asm['ttir']}")
 
     else:
-        compiled_kernel = kernel_unified_attention_3d[
+
+        # Helper to create scalar pointers
+        def scalar_ptr(val, dtype=torch.float32):
+            return torch.tensor([val], dtype=dtype).cuda()
+
+        compiled_kernel = wrapped_kernel_unified_attention_3d[
             (total_num_q_blocks, num_kv_heads, num_par_softmax_segments)
         ](
-            segm_output_ptr=softmax_segm_output,
-            segm_max_ptr=softmax_segm_max,
-            segm_expsum_ptr=softmax_segm_expsum,
-            query_ptr=q,
-            key_cache_ptr=k,
-            value_cache_ptr=v,
-            sink_ptr=sinks,
-            block_tables_ptr=block_table,
-            seq_lens_ptr=seqused_k,
-            alibi_slopes_ptr=alibi_slopes,
-            qq_bias_ptr=qq_bias,
-            scale=softmax_scale,
-            k_scale=k_descale,
-            v_scale=v_descale,
-            softcap=softcap,
-            num_query_heads=num_query_heads,
-            num_queries_per_kv=num_queries_per_kv,
-            block_table_stride=block_table.stride(0),
-            query_stride_0=q.stride(0),
-            query_stride_1=q.stride(1),
-            qq_bias_stride_0=qq_bias.stride(0) if use_qq_bias else 0,
-            BLOCK_SIZE=block_size,
-            TILE_SIZE=TILE_SIZE_DECODE,
-            HEAD_SIZE=head_size,
-            HEAD_SIZE_PADDED=triton.next_power_of_2(head_size),
-            USE_ALIBI_SLOPES=use_alibi_slopes,
-            USE_ALIBI_SQRT=use_alibi_sqrt,
-            USE_QQ_BIAS=use_qq_bias,
-            USE_SOFTCAP=(softcap > 0),
-            USE_SINKS=(sinks is not None),
-            USE_MM_PREFIX=use_mm_prefix,
-            MAX_MM_RANGES=max_mm_ranges,
-            mm_prefix_range_ptr=mm_prefix_range,
-            SLIDING_WINDOW=(1 + window_size[0]),
-            stride_k_cache_0=k.stride(0),
-            stride_k_cache_1=k.stride(1),
-            stride_k_cache_2=k.stride(2),
-            stride_k_cache_3=k.stride(3),
-            stride_v_cache_0=v.stride(0),
-            stride_v_cache_1=v.stride(1),
-            stride_v_cache_2=v.stride(2),
-            stride_v_cache_3=v.stride(3),
-            query_start_len_ptr=cu_seqlens_q,
-            BLOCK_Q=BLOCK_Q,
-            num_seqs=num_seqs,
-            BLOCK_M=BLOCK_M,
-            NUM_SEGMENTS_PER_SEQ=num_par_softmax_segments,
+            softmax_segm_output,  # segm_output_ptr
+            softmax_segm_max,     # segm_max_ptr
+            softmax_segm_expsum,  # segm_expsum_ptr
+            q,                   # query_ptr
+            k,                   # key_cache_ptr
+            v,                   # value_cache_ptr
+            sinks,               # sink_ptr
+            block_table,         # block_tables_ptr
+            seqused_k,           # seq_lens_ptr
+            alibi_slopes,        # alibi_slopes_ptr
+            qq_bias,             # qq_bias_ptr
+            scalar_ptr(softmax_scale, dtype=torch.float32),  # scale_ptr
+            scalar_ptr(k_descale if k_descale is not None else 1.0, dtype=torch.float32),  # k_scale_ptr
+            scalar_ptr(v_descale if v_descale is not None else 1.0, dtype=torch.float32),  # v_scale_ptr
+            scalar_ptr(softcap, dtype=torch.float32),  # softcap_ptr
+            num_query_heads,      # num_query_heads (constexpr)
+            num_queries_per_kv,   # num_queries_per_kv (constexpr)
+            scalar_ptr(block_table.stride(0), dtype=torch.int64),  # block_table_stride_ptr
+            scalar_ptr(q.stride(0), dtype=torch.int64),            # query_stride_0_ptr
+            scalar_ptr(q.stride(1), dtype=torch.int64),            # query_stride_1_ptr
+            scalar_ptr(qq_bias.stride(0) if use_qq_bias else 0, dtype=torch.int64),  # qq_bias_stride_0_ptr
+            block_size,              # BLOCK_SIZE (constexpr)
+            TILE_SIZE_DECODE,        # TILE_SIZE (constexpr)
+            head_size,               # HEAD_SIZE (constexpr)
+            triton.next_power_of_2(head_size),  # HEAD_SIZE_PADDED (constexpr)
+            int(use_alibi_slopes),   # USE_ALIBI_SLOPES (constexpr)
+            int(use_alibi_sqrt),     # USE_ALIBI_SQRT (constexpr)
+            int(use_qq_bias),        # USE_QQ_BIAS (constexpr)
+            int(softcap > 0),        # USE_SOFTCAP (constexpr)
+            int(sinks is not None),  # USE_SINKS (constexpr)
+            1 + window_size[0],      # SLIDING_WINDOW (constexpr)
+            scalar_ptr(k.stride(0), dtype=torch.int64),  # stride_k_cache_0_ptr
+            scalar_ptr(k.stride(1), dtype=torch.int64),  # stride_k_cache_1_ptr
+            scalar_ptr(k.stride(2), dtype=torch.int64),  # stride_k_cache_2_ptr
+            k.stride(3),                                 # stride_k_cache_3 (constexpr)
+            scalar_ptr(v.stride(0), dtype=torch.int64),  # stride_v_cache_0_ptr
+            scalar_ptr(v.stride(1), dtype=torch.int64),  # stride_v_cache_1_ptr
+            scalar_ptr(v.stride(2), dtype=torch.int64),  # stride_v_cache_2_ptr
+            v.stride(3),                                 # stride_v_cache_3 (constexpr)
+            cu_seqlens_q,                                # query_start_len_ptr
+            BLOCK_Q,                                     # BLOCK_Q (constexpr)
+            scalar_ptr(num_seqs, dtype=torch.int32),     # num_seqs_ptr
+            BLOCK_M,                                     # BLOCK_M (constexpr)
+            num_par_softmax_segments,                    # NUM_SEGMENTS_PER_SEQ (constexpr)
+            int(use_mm_prefix),                          # USE_MM_PREFIX (constexpr)
+            max_mm_ranges,                               # MAX_MM_RANGES (constexpr)
+            mm_prefix_range,                             # mm_prefix_range_ptr
         )
 
         if SHOULD_LOG:
